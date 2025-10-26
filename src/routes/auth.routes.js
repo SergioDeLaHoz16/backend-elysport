@@ -12,7 +12,8 @@ const authController = new AuthController()
 const registerSchema = z.object({
   email: z.string().email("Invalid email format"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  fullName: z.string().min(1, "Full name is required"),
+  first_name: z.string().min(1, "First name is required"),
+  last_name: z.string().min(1, "Last name is required"),
   role: z.enum(["ADMIN", "TRAINER", "CLIENT"]).optional(),
   phone: z.string().optional(),
 })

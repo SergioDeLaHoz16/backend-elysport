@@ -3,11 +3,11 @@ import { sanitizeUser } from "../utils/sanitize.js"
 
 export class AuthService {
   async register(userData) {
-    const { email, password, firstName, lastName, role, phone } = userData
+    const { email, password, first_name, last_name, role, phone } = userData
 
-    console.log("[v0] Starting registration for:", email)
+    console.log("📥 Registrando usuario:", email)
 
-    // Check if user already exists using admin client
+    // Verificar si ya existe
     const { data: existingUser, error: checkError } = await supabaseAdmin
       .from("users")
       .select("id")
@@ -15,93 +15,71 @@ export class AuthService {
       .single()
 
     if (checkError && checkError.code !== "PGRST116") {
-      // PGRST116 is "not found" which is expected
-      console.error("[v0] Error checking existing user:", checkError)
-      const error = new Error(`Database error checking user: ${checkError.message}`)
-      error.statusCode = 500
-      throw error
+      throw new Error(`Error verificando usuario existente: ${checkError.message}`)
     }
 
     if (existingUser) {
-      console.log("[v0] User already exists:", email)
-      const error = new Error("User with this email already exists")
+      const error = new Error("El usuario ya existe")
       error.statusCode = 409
       throw error
     }
 
-    console.log("[v0] Creating auth user...")
-    // Create user with Supabase Auth
+    console.log("🧩 Creando usuario en Supabase Auth...")
+
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm email for admin registration
+      email_confirm: true,
       user_metadata: {
-        first_name: firstName,
-        last_name: lastName,
+        first_name,
+        last_name,
         role: role || "CLIENT",
         phone,
       },
     })
 
     if (authError) {
-      console.error("[v0] Auth creation error:", authError)
+      console.error("❌ Error creando usuario en Auth:", authError)
       const error = new Error(authError.message)
       error.statusCode = 400
       throw error
     }
 
-    console.log("[v0] Auth user created:", authData.user.id)
+    console.log("✅ Usuario Auth creado:", authData.user.id)
 
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    // Insertar datos adicionales si tu trigger no lo hace automáticamente
+    const { error: insertError } = await supabaseAdmin.from("users").insert([
+      {
+        id: authData.user.id,
+        email,
+        phone,
+        role: role || "CLIENT",
+        first_name,
+        last_name,
+        is_active: true,
+      },
+    ])
 
-    console.log("[v0] Fetching user data...")
-    // Get the created user data
-    const { data: user, error: userError } = await supabaseAdmin
-      .from("users")
-      .select("*, profile:profiles(*)")
-      .eq("id", authData.user.id)
-      .single()
-
-    if (userError) {
-      console.error("[v0] Error fetching user data:", {
-        code: userError.code,
-        message: userError.message,
-        details: userError.details,
-        hint: userError.hint,
-      })
-
-      // If user not found, it means the trigger didn't work
-      if (userError.code === "PGRST116") {
-        const error = new Error(
-          "User authentication created but profile not found. Please ensure database tables and triggers are set up correctly.",
-        )
-        error.statusCode = 500
-        throw error
-      }
-
-      const error = new Error(`Database error creating new user: ${userError.message}`)
-      error.statusCode = 500
-      throw error
+    if (insertError) {
+      console.error("❌ Error insertando usuario en tabla users:", insertError)
+      throw new Error(insertError.message)
     }
 
-    console.log("[v0] User data fetched successfully")
-    console.log("[v0] Signing in user...")
+    console.log("📦 Usuario insertado correctamente en tabla users")
 
-    // Generate session for the user
+    // Iniciar sesión inmediatamente
     const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
     if (sessionError) {
-      console.error("[v0] Session creation error:", sessionError)
+      console.error("❌ Error iniciando sesión:", sessionError)
       throw sessionError
     }
 
-    console.log("[v0] Registration completed successfully")
-
     return {
-      user: sanitizeUser(user),
+      user: sanitizeUser(authData.user),
       accessToken: sessionData.session.access_token,
       refreshToken: sessionData.session.refresh_token,
     }
