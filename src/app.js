@@ -2,6 +2,7 @@ import "./config/env.js"
 import express from "express"
 import cors from "cors"
 import helmet from "helmet"
+import cookieParser from "cookie-parser" // ✅ nuevo
 import { errorHandler } from "./middlewares/errorHandler.js"
 import { requestLogger } from "./middlewares/logger.js"
 import { rateLimiter } from "./middlewares/rateLimiter.js"
@@ -19,31 +20,36 @@ import dashboardRoutes from "./routes/dashboard.routes.js"
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// Security middleware
+// ✅ Seguridad
 app.use(helmet())
+
+// ✅ CORS configurado correctamente para cookies
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || "http://localhost:3000",
     credentials: true,
-  }),
+  })
 )
 
-// Rate limiting
+// ✅ Parser de cookies
+app.use(cookieParser())
+
+// ✅ Rate limiting
 app.use(rateLimiter)
 
-// Body parsing middleware
+// ✅ Body parsing
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// Request logging
+// ✅ Logs
 app.use(requestLogger)
 
-// Health check
+// ✅ Health Check
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() })
 })
 
-// API routes
+// ✅ Rutas principales
 app.use("/api/auth", authRoutes)
 app.use("/api/users", userRoutes)
 app.use("/api/subscriptions", subscriptionRoutes)
@@ -53,12 +59,12 @@ app.use("/api/notifications", notificationRoutes)
 app.use("/api/reports", reportRoutes)
 app.use("/api/dashboard", dashboardRoutes)
 
-// 404 handler
+// ✅ 404
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" })
 })
 
-// Error handling middleware (must be last)
+// ✅ Manejo de errores
 app.use(errorHandler)
 
 app.listen(PORT, () => {

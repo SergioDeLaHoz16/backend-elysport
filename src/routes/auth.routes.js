@@ -3,7 +3,7 @@ import { AuthController } from "../controllers/auth.controller.js"
 import { validateRequest } from "../utils/validation.js"
 import { z } from "zod"
 import { authenticate } from "../middlewares/auth.js"
-import { authRateLimiter } from "../middlewares/rateLimiter.js"
+import { authRateLimiter, refreshRateLimiter } from "../middlewares/rateLimiter.js"
 
 const router = Router()
 const authController = new AuthController()
@@ -23,10 +23,6 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 })
 
-const refreshSchema = z.object({
-  refreshToken: z.string().min(1, "Refresh token is required"),
-})
-
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z.string().min(8, "New password must be at least 8 characters"),
@@ -37,9 +33,9 @@ router.post("/register", authRateLimiter, validateRequest(registerSchema), authC
 
 router.post("/login", authRateLimiter, validateRequest(loginSchema), authController.login.bind(authController))
 
-router.post("/refresh", validateRequest(refreshSchema), authController.refresh.bind(authController))
+router.post("/refresh", refreshRateLimiter, authController.refresh.bind(authController))
 
-router.post("/logout", validateRequest(refreshSchema), authController.logout.bind(authController))
+router.post("/logout", authController.logout.bind(authController))
 
 router.post("/logout-all", authenticate, authController.logoutAll.bind(authController))
 

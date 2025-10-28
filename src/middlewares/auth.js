@@ -1,37 +1,39 @@
-import { supabase, supabaseAdmin } from "../utils/supabase.js"
+import { supabaseAdmin, supabase } from "../utils/supabase.js"
 
+/**
+ * ✅ Middleware de autenticación
+ * - Verifica el JWT en cookies o en el header Authorization
+ * - Obtiene los datos del usuario desde la base de datos
+ */
 export const authenticate = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization
+    const token =
+      req.cookies?.access_token ||
+      (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")
+        ? req.headers.authorization.split(" ")[1]
+        : null)
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!token) {
       return res.status(401).json({ error: "No token provided" })
     }
 
-    const token = authHeader.substring(7)
+    const { data, error } = await supabase.auth.getUser(token)
 
-    // Verify token with Supabase
-    const {
-      data: { user: authUser },
-      error,
-    } = await supabase.auth.getUser(token)
-
-    if (error || !authUser) {
-      return res.status(401).json({ error: "Invalid token" })
+    if (error || !data.user) {
+      return res.status(401).json({ error: "Invalid or expired token" })
     }
 
-    // Fetch user data from database
     const { data: user, error: userError } = await supabaseAdmin
       .from("users")
       .select("id, email, role, first_name, last_name, is_active")
-      .eq("id", authUser.id)
+      .eq("id", data.user.id)
       .single()
 
     if (userError || !user || !user.is_active) {
       return res.status(401).json({ error: "User not found or inactive" })
     }
 
-    // Attach user to request
+    // 4️⃣ Adjuntar datos del usuario al request
     req.user = {
       id: user.id,
       email: user.email,
@@ -41,15 +43,17 @@ export const authenticate = async (req, res, next) => {
       isActive: user.is_active,
     }
 
-    // Attach auth token for further operations
-    req.authToken = token
-
     next()
   } catch (error) {
-    return res.status(401).json({ error: "Authentication failed" })
+    console.error("❌ Auth error:", error.message)
+    return res.status(401).json({ error: "Invalid or expired token" })
   }
 }
 
+/**
+ * ✅ Middleware de autorización por roles
+ * - Permite acceso solo a los roles definidos
+ */
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -57,7 +61,7 @@ export const authorize = (...roles) => {
     }
 
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ error: "Forbidden: Insufficient permissions" })
+      return res.status(403).json({ error: "Forbidden: insufficient permissions" })
     }
 
     next()

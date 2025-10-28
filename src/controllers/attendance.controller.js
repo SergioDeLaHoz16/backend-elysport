@@ -1,11 +1,14 @@
-import  {AttendanceService} from "../services/attendance.service.js"
+import { AttendanceService } from "../services/attendance.service.js"
 
 const attendanceService = new AttendanceService()
 
 export class AttendanceController {
   async checkIn(req, res, next) {
     try {
-      const { userId, notes } = req.body
+      // ✅ Ya no se pasa el userId manualmente desde el body
+      const userId = req.user.id // viene del token JWT
+      const { notes } = req.body
+
       const attendance = await attendanceService.checkIn(userId, notes)
       res.status(201).json({ attendance })
     } catch (error) {
@@ -15,7 +18,8 @@ export class AttendanceController {
 
   async checkOut(req, res, next) {
     try {
-      const attendance = await attendanceService.checkOut(req.params.id)
+      const userId = req.user.id // ✅ también viene del token
+      const attendance = await attendanceService.checkOut(userId)
       res.json({ attendance })
     } catch (error) {
       next(error)
@@ -25,14 +29,15 @@ export class AttendanceController {
   async getAllAttendances(req, res, next) {
     try {
       const filters = {
-        userId: req.query.userId,
+        // ✅ Si el usuario es ADMIN puede filtrar por userId; si no, solo ve los suyos
+        userId: req.user.role === "ADMIN" ? req.query.userId : req.user.id,
         startDate: req.query.startDate,
         endDate: req.query.endDate,
-        page: Number.parseInt(req.query.page) || 1,
-        limit: Number.parseInt(req.query.limit) || 10,
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
       }
 
-      const result = await attendanceService.getAllAttendances(filters)
+      const result = await attendanceService.getAttendances(filters)
       res.json(result)
     } catch (error) {
       next(error)

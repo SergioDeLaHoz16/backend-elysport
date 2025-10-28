@@ -14,3 +14,10 @@ export const authRateLimiter = rateLimit({
   message: "Too many authentication attempts, please try again later.",
   skipSuccessfulRequests: true,
 })
+
+export const refreshRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10, // Max 10 refresh attempts per minute
+  message: "Too many refresh attempts, please try again later.",
+  skipSuccessfulRequests: true,
+})
