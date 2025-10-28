@@ -7,6 +7,12 @@ const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC
 if (!supabaseUrl) {
   throw new Error("Missing SUPABASE_URL environment variable")
 }
+if (!supabaseAnonKey) {
+  throw new Error("Missing SUPABASE_ANON_KEY environment variable")
+}
+if (!supabaseServiceKey) {
+  console.warn("Warning: SUPABASE_SERVICE_ROLE_KEY is not set. Admin client will not be available.")
+}
 
 // Admin client with service role key (bypasses RLS)
 export const supabaseAdmin = supabaseServiceKey

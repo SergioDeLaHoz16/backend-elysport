@@ -86,31 +86,71 @@ export class AttendanceService {
   }
 
   async getAttendances(filters = {}) {
-    const { userId, startDate, endDate, page = 1, limit = 10 } = filters
+    const { userId, startDate, endDate, page = 1, limit = 10 } = filters;
 
-    let query = supabase.from("attendances").select("*, users(first_name, last_name, email)", { count: "exact" })
+    try {
+      // 🚨 Evita el uso de "users(...)" porque causa recursión si hay RLS en users
+      // En su lugar, obtenemos solo el user_id aquí y luego hacemos un join manual si lo necesitas
+      let query = supabase
+        .from("attendances")
+        .select("id, user_id, check_in, check_out, duration, notes, created_at", { count: "exact" })
+        .order("check_in", { ascending: false });
 
-    if (userId) query = query.eq("user_id", userId)
-    if (startDate) query = query.gte("check_in", new Date(startDate).toISOString())
-    if (endDate) query = query.lte("check_in", new Date(endDate).toISOString())
+      if (userId) query = query.eq("user_id", userId);
+      if (startDate) query = query.gte("check_in", new Date(startDate).toISOString());
+      if (endDate) query = query.lte("check_in", new Date(endDate).toISOString());
 
-    const from = (page - 1) * limit
-    const to = from + limit - 1
+      const safeLimit = Number(limit) > 0 ? Number(limit) : 10;
+      const safePage = Number(page) > 0 ? Number(page) : 1;
+      const from = (safePage - 1) * safeLimit;
+      const to = from + safeLimit - 1;
 
-    const { data: attendances, error, count } = await query.order("check_in", { ascending: false }).range(from, to)
+      const { data: attendances, error, count } = await query.range(from, to);
 
-    if (error) throw error
+      if (error) {
+        console.error("[AttendanceService] Error en getAttendances:", error.message);
+        throw new Error("No se pudieron obtener las asistencias desde la base de datos");
+      }
 
-    return {
-      attendances,
-      pagination: {
-        page,
-        limit,
-        total: count,
-        totalPages: Math.ceil(count / limit),
-      },
+      // 🚀 Si quieres mostrar nombres en el dashboard, haz una segunda consulta segura:
+      const userIds = attendances.map((a) => a.user_id);
+      let userMap = {};
+
+      if (userIds.length > 0) {
+        const { data: usersData, error: userErr } = await supabase
+          .from("users")
+          .select("id, first_name, last_name, email")
+          .in("id", userIds);
+
+        if (!userErr && usersData) {
+          userMap = usersData.reduce((acc, u) => {
+            acc[u.id] = u;
+            return acc;
+          }, {});
+        }
+      }
+
+      // Agregar información de usuario sin recursión
+      const attendancesWithUsers = attendances.map((a) => ({
+        ...a,
+        user: userMap[a.user_id] || null,
+      }));
+
+      return {
+        attendances: attendancesWithUsers || [],
+        pagination: {
+          page: safePage,
+          limit: safeLimit,
+          total: count ?? attendancesWithUsers.length,
+          totalPages: count ? Math.ceil(count / safeLimit) : 1,
+        },
+      };
+    } catch (err) {
+      console.error("[AttendanceService] Error general en getAttendances:", err);
+      throw err;
     }
   }
+
 
   async getCurrentlyPresent() {
     const { data: attendances, error } = await supabase
