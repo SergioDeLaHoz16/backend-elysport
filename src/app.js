@@ -16,7 +16,7 @@ import attendanceRoutes from "./routes/attendance.routes.js"
 import notificationRoutes from "./routes/notification.routes.js"
 import reportRoutes from "./routes/report.routes.js"
 import dashboardRoutes from "./routes/dashboard.routes.js"
-
+import adminRoutes from "./routes/admin.routes.js";
 const app = express()
 const PORT = process.env.PORT || 3001
 
@@ -58,6 +58,7 @@ app.use("/api/attendances", attendanceRoutes)
 app.use("/api/notifications", notificationRoutes)
 app.use("/api/reports", reportRoutes)
 app.use("/api/dashboard", dashboardRoutes)
+app.use("/api/admin", adminRoutes);
 
 // ✅ 404
 app.use((req, res) => {

@@ -18,7 +18,7 @@ const checkInSchema = z.object({
 // ✅ Registrar entrada
 router.post(
   "/check-in",
-  authorize("ADMIN", "TRAINER", "USER"),
+  authorize("ADMIN", "TRAINER", "CLIENT"),
   validateRequest(checkInSchema),
   attendanceController.checkIn.bind(attendanceController)
 )

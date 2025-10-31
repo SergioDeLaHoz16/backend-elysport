@@ -30,7 +30,7 @@ export class AttendanceController {
     try {
       const filters = {
         // ✅ Si el usuario es ADMIN puede filtrar por userId; si no, solo ve los suyos
-        userId: req.user.role === "ADMIN" ? req.query.userId : req.user.id,
+        userId: req.user.role === "ADMIN".toLowerCase() ? req.query.userId : req.user.id,
         startDate: req.query.startDate,
         endDate: req.query.endDate,
         page: Number(req.query.page) || 1,
